@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>PT실</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800;900&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-user-select: none;
+            user-select: none; 
+            -webkit-tap-highlight-color: transparent; 
+            touch-action: manipulation;
+        }
+
+        body {
+            /* 상하 여백을 6px로 더 줄여서 그리드 세로 공간 극대화 */
+            padding: 6px 8px; 
+            background-color: #f4f6f8; 
+            color: #111827;
+            height: 100vh; 
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; 
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px; 
+            padding: 8px 20px; 
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.02);
+            flex-shrink: 0; 
+        }
+
+        .header-title-zone h1 {
+            font-size: 24px; 
+            font-weight: 800;
+            color: #1e293b;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .header-title-zone h1::before {
+            content: '';
+            display: block;
+            width: 10px;
+            height: 10px;
+            background-color: #3b82f6;
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+        }
+
+        .header-status-zone {
+            display: flex;
+            align-items: center;
+        }
+
+        #live-clock {
+            font-size: 22px; 
+            font-weight: 800;
+            color: #0f172a;
+            font-variant-numeric: tabular-nums;
+            background: #f1f5f9;
+            padding: 6px 14px;
+            border-radius: 10px;
+            letter-spacing: 1px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+            border: 1px solid #e2e8f0;
+        }
+        
+        #grid-container {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr); 
+            grid-template-rows: repeat(5, 1fr); 
+            gap: 6px; 
+            flex: 1; 
+            min-height: 0; 
+            min-width: 1024px; 
+        }
+        
+        .bed {
+            background-color: #ffffff;
+            border: 2px solid #e5e7eb; 
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden; 
+            padding: 4px 2px; 
+        }
+        
+        .bed:active {
+            transform: scale(0.96); 
+            background-color: #f9fafb;
+        }
+        
+        .bed.running { background-color: #eff6ff; border-color: #3b82f6; border-width: 3px; }
+        .bed.running .bed-number { color: #1d4ed8; }
+        .bed.running .time-end { color: #1e3a8a; }
+
+        .bed.warning { background-color: #f0fdf4; border-color: #10b981; border-width: 3px; }
+        .bed.warning .bed-number { color: #047857; }
+        .bed.warning .time-end { color: #064e3b; }
+
+        .bed.done {
+            background-color: #fef2f2; border-color: #ef4444; border-width: 3px;
+            animation: alertPulse 1.5s infinite cubic-bezier(0.4, 0, 0.6, 1);
+        }
+        .bed.done .bed-number { color: #b91c1c; }
+        .bed.done .time-end { color: #7f1d1d; }
+
+        /* 대기 상태의 베드 번호 */
+        .bed-number {
+            font-size: 40px; 
+            font-weight: 900;
+            color: #374151;
+            letter-spacing: -1.5px;
+            line-height: 1; 
+            margin-bottom: 2px;
+            transition: all 0.2s ease-in-out;
+        }
+
+        /* 치료 중 베드 번호 */
+        .bed.running .bed-number,
+        .bed.warning .bed-number,
+        .bed.done .bed-number {
+            font-size: 24px; 
+            margin-top: 12px; 
+            margin-bottom: 2px; /* 태그가 빠졌으므로 살짝 여유를 줌 */
+        }
+        
+        .time-display {
+            text-align: center;
+            display: none; 
+            width: 100%;
+        }
+        
+        .bed.running .time-display, 
+        .bed.warning .time-display, 
+        .bed.done .time-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .time-start {
+            font-size: 11px; 
+            color: #64748b;
+            font-weight: 700;
+            margin-bottom: 2px; /* 간격 살짝 최적화 */
+        }
+        
+        .time-end {
+            font-size: 22px; 
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.5px;
+            line-height: 1; 
+        }
+        
+        .status-badge {
+            font-size: 14px; 
+            color: #94a3b8;
+            font-weight: 800;
+            background: #f1f5f9;
+            padding: 4px 12px;
+            border-radius: 20px;
+            margin-top: 4px;
+        }
+
+        .bed.running .status-badge, 
+        .bed.warning .status-badge, 
+        .bed.done .status-badge {
+            display: none; 
+        }
+
+        /* 환자 뱃지 */
+        .patient-type {
+            position: absolute;
+            top: 4px; right: 4px; 
+            font-size: 11px; 
+            font-weight: 800;
+            padding: 2px 5px; 
+            border-radius: 4px;
+            display: none; 
+        }
+        .type-inpatient { display: block; background-color: #fee2e2; color: #991b1b; }
+        .type-outpatient { display: block; background-color: #f3e8ff; color: #6b21a8; }
+
+        @keyframes alertPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.2), 0 4px 6px rgba(0,0,0,0.05); }
+            50% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0), 0 10px 20px rgba(239, 68, 68, 0.1); }
+        }
+
+        /* --- 모달 팝업 --- */
+        .modal-overlay {
+            display: none; 
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(15, 23, 42, 0.4); 
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            z-index: 1000;
+            justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 36px 32px;
+            border-radius: 24px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            width: 380px;
+        }
+        .modal-text {
+            font-size: 24px; font-weight: 800;
+            margin-bottom: 24px; color: #0f172a; letter-spacing: -0.5px;
+        }
+        
+        .modal-buttons { display: flex; gap: 10px; }
+        .modal-buttons.column { flex-direction: column; }
+        .btn {
+            flex: 1; padding: 18px 0; 
+            font-size: 20px; font-weight: 800;
+            border: none; border-radius: 14px;
+            cursor: pointer; transition: all 0.2s;
+        }
+        
+        .btn-cancel { background-color: #f1f5f9; color: #475569; }
+        .btn-reset { background-color: #ef4444; color: white; }
+        .btn-inpatient { background-color: #fee2e2; color: #991b1b; }
+        .btn-outpatient { background-color: #f3e8ff; color: #6b21a8; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-title-zone">
+            <h1>PT실</h1>
+        </div>
+        <div class="header-status-zone">
+            <div id="live-clock">00:00:00</div>
+        </div>
+    </header>
+
+    <div id="grid-container"></div>
+
+    <div id="select-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-text">환자 유형을 선택하세요</div>
+            <div class="modal-buttons">
+                <button class="btn btn-inpatient" onclick="startWithPatientType('inpatient')">입원환자</button>
+                <button class="btn btn-outpatient" onclick="startWithPatientType('outpatient')">외래환자</button>
+            </div>
+            <div class="modal-buttons" style="margin-top: 10px;">
+                <button class="btn btn-cancel" onclick="closeSelectModal()">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="custom-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-text" id="modal-message">베드 상태 관리</div>
+            
+            <div class="modal-buttons" id="time-adjust-zone" style="margin-bottom: 10px;">
+                <button class="btn" style="background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1;" onclick="adjustTime(-5)">- 5분</button>
+                <button class="btn" style="background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;" onclick="adjustTime(5)">+ 5분</button>
+            </div>
+
+            <div class="modal-buttons column">
+                <button class="btn btn-reset" onclick="confirmReset()">완전 초기화 (환자 퇴실)</button>
+                <button class="btn btn-cancel" onclick="closeModal()">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const beds = [
+            { id: '10', col: 1, row: 1 }, { id: '9', col: 2, row: 1 }, { id: '8', col: 3, row: 1 },
+            { id: '7', col: 4, row: 1 }, { id: '6', col: 5, row: 1 }, { id: '5', col: 6, row: 1 },
+            { id: '4', col: 7, row: 1 }, { id: '3', col: 8, row: 1 }, { id: '2', col: 9, row: 1 }, { id: '1', col: 10, row: 1 },
+
+            { id: '11', col: 1, row: 2 },
+            { id: '15', col: 1, row: 3 }, 
+            { id: '16', col: 1, row: 4 },
+            { id: '17', col: 1, row: 5 }, 
+
+            { id: '18', col: 7, row: 5 },
+            { id: '19', col: 8, row: 5 },
+            { id: '20', col: 9, row: 5 },
+            { id: '21', col: 10, row: 5 }
+        ];
+
+        const DURATION_MINUTES = 20; 
+        let timers = {};
+        let bedToReset = null; 
+        let pendingBedId = null; 
+
+        const container = document.getElementById('grid-container');
+        const resetModal = document.getElementById('custom-modal');
+        const selectModal = document.getElementById('select-modal');
+        const modalMessage = document.getElementById('modal-message');
+
+        function updateLiveClock() {
+            const now = new Date();
+            const h = now.getHours().toString().padStart(2, '0');
+            const m = now.getMinutes().toString().padStart(2, '0');
+            const s = now.getSeconds().toString().padStart(2, '0');
+            document.getElementById('live-clock').innerText = `${h}:${m}:${s}`;
+        }
+        setInterval(updateLiveClock, 1000);
+        updateLiveClock();
+
+        function formatTime(date) {
+            const h = date.getHours().toString().padStart(2, '0');
+            const m = date.getMinutes().toString().padStart(2, '0');
+            return `${h}:${m}`;
+        }
+
+        function closeModal() {
+            resetModal.style.display = 'none';
+            bedToReset = null;
+        }
+
+        function closeSelectModal() {
+            selectModal.style.display = 'none';
+            pendingBedId = null;
+        }
+
+        function confirmReset() {
+            if (bedToReset) {
+                if (timers[bedToReset] && timers[bedToReset].interval) {
+                    clearInterval(timers[bedToReset].interval);
+                }
+                delete timers[bedToReset];
+                localStorage.removeItem(`hotpack_timer_${bedToReset}`);
+                
+                const bedElement = document.getElementById(`bed-${bedToReset}`);
+                bedElement.className = 'bed'; 
+                
+                const typeBadge = document.getElementById(`type-${bedToReset}`);
+                if (typeBadge) typeBadge.className = 'patient-type'; 
+
+                const startDisplay = document.getElementById(`start-${bedToReset}`);
+                const endDisplay = document.getElementById(`end-${bedToReset}`);
+                if (startDisplay) startDisplay.innerText = '';
+                if (endDisplay) endDisplay.innerText = '';
+            }
+            closeModal(); 
+        }
+
+        function startTimerLogic(id, startTimeStr, endTimeStr, endTimeMs, patientType) {
+            const bedElement = document.getElementById(`bed-${id}`);
+            const startDisplay = document.getElementById(`start-${id}`);
+            const endDisplay = document.getElementById(`end-${id}`);
+            const typeBadge = document.getElementById(`type-${id}`);
+
+            startDisplay.innerText = `시작 ${startTimeStr}`;
+
+            if (patientType === 'inpatient') {
+                typeBadge.innerText = '입원';
+                typeBadge.className = 'patient-type type-inpatient';
+            } else if (patientType === 'outpatient') {
+                typeBadge.innerText = '외래';
+                typeBadge.className = 'patient-type type-outpatient';
+            } else {
+                typeBadge.className = 'patient-type'; 
+            }
+
+            endDisplay.innerText = `${endTimeStr}`; 
+
+            const updateTimer = () => {
+                const currentTime = Date.now();
+                const remaining = endTimeMs - currentTime;
+
+                if (remaining <= 0) {
+                    clearInterval(timers[id].interval);
+                    bedElement.className = 'bed done';
+                    endDisplay.innerText = '종료';
+                    playBeep(); 
+                } else if (remaining <= 5 * 60 * 1000) { 
+                    bedElement.className = 'bed warning';
+                } else {
+                    bedElement.className = 'bed running'; 
+                }
+            };
+
+            updateTimer();
+            timers[id] = {
+                interval: setInterval(updateTimer, 1000),
+                endTimeMs: endTimeMs,
+                startTimeStr: startTimeStr,
+                endTimeStr: endTimeStr,
+                patientType: patientType,
+                state: 'timer'
+            };
+        }
+
+        function toggleTimer(id) {
+            if (timers[id]) {
+                bedToReset = id;
+                modalMessage.innerText = `${id}번 베드 시간 관리`;
+                resetModal.style.display = 'flex'; 
+                return;
+            }
+
+            pendingBedId = id;
+            selectModal.style.display = 'flex';
+        }
+
+        function adjustTime(minutes) {
+            if (bedToReset && timers[bedToReset]) {
+                const id = bedToReset;
+                
+                const newEndTimeMs = timers[id].endTimeMs + (minutes * 60 * 1000);
+                const newEndDate = new Date(newEndTimeMs);
+                const newEndTimeStr = formatTime(newEndDate);
+                
+                const timerData = {
+                    startTimeStr: timers[id].startTimeStr,
+                    endTimeStr: newEndTimeStr,
+                    endTimeMs: newEndTimeMs,
+                    patientType: timers[id].patientType,
+                    state: 'timer' 
+                };
+                localStorage.setItem(`hotpack_timer_${id}`, JSON.stringify(timerData));
+
+                if (timers[id].interval) {
+                    clearInterval(timers[id].interval);
+                }
+
+                startTimerLogic(id, timerData.startTimeStr, timerData.endTimeStr, timerData.endTimeMs, timerData.patientType);
+                
+                closeModal();
+            }
+        }
+
+        function startWithPatientType(type) {
+            if (!pendingBedId) return;
+            const id = pendingBedId; 
+            
+            closeSelectModal(); 
+
+            const now = new Date();
+            const exactStartTimeString = formatTime(now); 
+
+            const roundedMinutes = Math.round(now.getMinutes() / 5) * 5;
+            const baseStartTime = new Date(now);
+            baseStartTime.setMinutes(roundedMinutes);
+            baseStartTime.setSeconds(0);
+            baseStartTime.setMilliseconds(0);
+
+            const endTime = new Date(baseStartTime.getTime() + (DURATION_MINUTES * 60 * 1000));
+            const calculatedEndTimeString = formatTime(endTime); 
+
+            const timerData = {
+                startTimeStr: exactStartTimeString,
+                endTimeStr: calculatedEndTimeString,
+                endTimeMs: endTime.getTime(),
+                patientType: type,
+                state: 'timer' 
+            };
+            localStorage.setItem(`hotpack_timer_${id}`, JSON.stringify(timerData));
+
+            startTimerLogic(id, timerData.startTimeStr, timerData.endTimeStr, timerData.endTimeMs, timerData.patientType);
+        }
+
+        window.addEventListener('load', () => {
+            beds.forEach(bed => {
+                const bedDiv = document.createElement('div');
+                bedDiv.className = 'bed';
+                bedDiv.style.gridColumn = bed.col;
+                bedDiv.style.gridRow = bed.row;
+                bedDiv.id = `bed-${bed.id}`;
+
+                bedDiv.innerHTML = `
+                    <div class="patient-type" id="type-${bed.id}"></div>
+                    <div class="bed-number">${bed.id}</div>
+                    <div class="status-badge" id="status-${bed.id}">대기중</div>
+                    <div class="time-display" id="time-${bed.id}">
+                        <div class="time-start" id="start-${bed.id}"></div>
+                        <div class="time-end" id="end-${bed.id}"></div>
+                    </div>
+                `;
+
+                bedDiv.addEventListener('click', () => toggleTimer(bed.id));
+                container.appendChild(bedDiv);
+
+                const savedData = localStorage.getItem(`hotpack_timer_${bed.id}`);
+                if (savedData) {
+                    const timerData = JSON.parse(savedData);
+                    startTimerLogic(bed.id, timerData.startTimeStr, timerData.endTimeStr, timerData.endTimeMs, timerData.patientType);
+                }
+            });
+        });
+
+        function playBeep() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gainNode = ctx.createGain();
+                osc.connect(gainNode);
+                gainNode.connect(ctx.destination);
+                osc.frequency.value = 830; 
+                gainNode.gain.setValueAtTime(0, ctx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.8, ctx.currentTime + 0.05);
+                gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.4);
+            } catch(e) {
+                console.log('Audio error');
+            }
+        }
+    </script>
+</body>
+</html>
